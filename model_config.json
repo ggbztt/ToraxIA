@@ -1,0 +1,29 @@
+{
+    "pathologies": [
+        "Atelectasis",
+        "Cardiomegaly",
+        "Effusion",
+        "Infiltration",
+        "Mass",
+        "Nodule",
+        "Pneumonia",
+        "Pneumothorax",
+        "Consolidation",
+        "Edema",
+        "Emphysema",
+        "Fibrosis",
+        "Pleural_Thickening",
+        "Hernia"
+    ],
+    "input_shape": [
+        224,
+        224,
+        3
+    ],
+    "model_version": "1.0.0",
+    "training_date": "2026-01-19",
+    "epochs": 20,
+    "dataset": "NIH ChestX-ray14",
+    "architecture": "DenseNet121",
+    "total_images": 100000
+}

@@ -77,11 +77,12 @@ def main():
                 
                 st.session_state.model = model
                 st.session_state.class_names = class_names
+                st.session_state.model_config = config  # Incluye thresholds y gradcam_layer
                 st.session_state.model_loaded = True
                 
             except Exception as e:
                 st.error(f"❌ Error cargando el modelo: {str(e)}")
-                st.info("💡 Asegúrate de que `modelo_final.keras` esté en la carpeta `models/`")
+                st.info("💡 Asegúrate de que `best_model_epochs13-18.keras` esté en la carpeta `models/`")
                 st.stop()
     
     # Obtener usuario actual
@@ -150,17 +151,46 @@ def render_home_page():
     
     st.markdown("---")
     
-    # Estadísticas del usuario (placeholder)
+    # Obtener estadísticas reales del usuario
+    from services.database import get_user_analyses
+    from datetime import datetime
+    
+    user_analyses = get_user_analyses(user['id'], limit=100)
+    
+    # Calcular estadísticas
+    total_analyses = len(user_analyses)
+    
+    # Precisión promedio (solo de los que tienen verificación)
+    verified_analyses = [a for a in user_analyses if a.get('acerto_toraxia') is not None]
+    if verified_analyses:
+        correct_count = len([a for a in verified_analyses if a.get('acerto_toraxia') == True])
+        precision = (correct_count / len(verified_analyses)) * 100
+        precision_text = f"{precision:.1f}%"
+    else:
+        precision_text = "N/A"
+    
+    # Último análisis
+    if user_analyses:
+        try:
+            last_timestamp = user_analyses[0].get('timestamp', '')
+            dt = datetime.fromisoformat(last_timestamp)
+            last_analysis = dt.strftime("%d/%m/%Y")
+        except:
+            last_analysis = "Reciente"
+    else:
+        last_analysis = "Nunca"
+    
+    # Mostrar estadísticas
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("📊 Análisis Realizados", "0", help="Total de análisis que has realizado")
+        st.metric("📊 Análisis Realizados", total_analyses, help="Total de análisis que has realizado")
     
     with col2:
-        st.metric("🎯 Precisión Promedio", "N/A", help="Precisión promedio de tus diagnósticos")
+        st.metric("🎯 Precisión Promedio", precision_text, help="Precisión promedio de tus diagnósticos verificados")
     
     with col3:
-        st.metric("📅 Último Análisis", "Nunca", help="Fecha de tu último análisis")
+        st.metric("📅 Último Análisis", last_analysis, help="Fecha de tu último análisis")
     
     st.markdown("---")
     
@@ -198,7 +228,7 @@ def render_home_page():
         <strong>Modelo:</strong> DenseNet-121<br>
         <strong>Dataset:</strong> NIH ChestX-ray14<br>
         <strong>Imágenes de entrenamiento:</strong> 100,000<br>
-        <strong>AUC Macro:</strong> 0.802<br>
+        <strong>AUC Macro:</strong> 0.80<br>
         <strong>Interpretabilidad:</strong> Saliency Maps<br><br>
         El modelo utiliza mapas de activación por gradientes para visualizar las regiones de interés.
         </div>
@@ -235,7 +265,153 @@ def render_activity_feed():
     
     st.markdown("---")
     
-    st.info("🚧 **En desarrollo**: Esta página mostrará los últimos 20 análisis públicos.")
+    # Filtro por área de estudio
+    from services.database import get_recent_public_analyses
+    from utils.translations import translate_pathology
+    
+    col_filter, col_refresh = st.columns([3, 1])
+    
+    with col_filter:
+        area_filter = st.selectbox(
+            "Filtrar por área de estudio:",
+            ["Todas", "Medicina", "Enfermería", "Imagenología", "Otras"],
+            key="activity_area_filter"
+        )
+    
+    with col_refresh:
+        if st.button("🔄 Actualizar", use_container_width=True):
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Obtener análisis públicos
+    analyses = get_recent_public_analyses(limit=20)
+    
+    if not analyses:
+        st.info("📭 No hay análisis públicos disponibles todavía.")
+        st.write("Los análisis se mostrarán aquí cuando los usuarios guarden sus resultados.")
+        return
+    
+    # Filtrar por área si es necesario
+    if area_filter != "Todas":
+        analyses = [a for a in analyses if a.get('academico_area', '').lower() == area_filter.lower()]
+    
+    if not analyses:
+        st.info(f"📭 No hay análisis del área '{area_filter}' disponibles.")
+        return
+    
+    st.caption(f"Mostrando {len(analyses)} análisis")
+    
+    # Renderizar cards de actividad
+    for i, analysis in enumerate(analyses):
+        render_activity_card(analysis, i)
+
+
+def render_activity_card(analysis: dict, index: int):
+    """Renderiza una card de actividad (datos anonimizados)"""
+    from utils.translations import translate_pathology
+    from datetime import datetime
+    
+    # Datos básicos
+    top_prediction = analysis.get('top_prediction', 'N/A')
+    top_probability = analysis.get('top_probability', 0)
+    timestamp = analysis.get('timestamp', '')
+    academico_area = analysis.get('academico_area', 'N/A')
+    acerto = analysis.get('acerto_toraxia')
+    overlay_url = analysis.get('overlay_image_url')
+    
+    # Traducir patología
+    pathology_es = translate_pathology(top_prediction)
+    
+    # Formatear fecha
+    try:
+        dt = datetime.fromisoformat(timestamp)
+        time_ago = get_time_ago(dt)
+    except:
+        time_ago = "Hace un momento"
+    
+    # Color según probabilidad
+    if top_probability >= 0.7:
+        color = "#e74c3c"  # Rojo
+    elif top_probability >= 0.4:
+        color = "#f39c12"  # Naranja
+    else:
+        color = "#27ae60"  # Verde
+    
+    # Verificación emoji
+    if acerto is True:
+        verificacion = "✅ Verificado"
+    elif acerto is False:
+        verificacion = "❌ No coincidió"
+    else:
+        verificacion = "⏳ Pendiente"
+    
+    # Card HTML
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); 
+                padding: 1rem; border-radius: 12px; margin-bottom: 1rem;
+                border-left: 4px solid {color}; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div>
+                <span style="font-size: 1.2rem; font-weight: bold; color: {color};">{pathology_es}</span>
+                <span style="color: #666; font-size: 0.85rem;"> ({top_prediction})</span>
+            </div>
+            <span style="background: {color}; color: white; padding: 0.25rem 0.75rem; 
+                         border-radius: 20px; font-weight: bold; font-size: 0.9rem;">
+                {top_probability*100:.1f}%
+            </span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: #666; font-size: 0.85rem;">
+                📚 {academico_area.capitalize()} • ⏰ {time_ago} • {verificacion}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Expander con más detalles
+    with st.expander(f"🔍 Ver detalles", expanded=False):
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            if overlay_url:
+                st.image(overlay_url, caption="Mapa de Activación", use_container_width=True)
+            else:
+                st.info("📷 Sin imagen")
+        
+        with col2:
+            st.markdown("**Top 5 Predicciones:**")
+            predictions_dict = analysis.get('predictions_json', {})
+            if predictions_dict:
+                sorted_preds = sorted(predictions_dict.items(), key=lambda x: x[1], reverse=True)[:5]
+                for rank, (pathology, prob) in enumerate(sorted_preds, 1):
+                    emoji = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][rank-1]
+                    pathology_translated = translate_pathology(pathology)
+                    st.write(f"{emoji} **{pathology_translated}**: {prob*100:.1f}%")
+
+
+def get_time_ago(dt):
+    """Calcula tiempo transcurrido en formato legible"""
+    from datetime import datetime, timezone
+    
+    now = datetime.now()
+    diff = now - dt.replace(tzinfo=None)
+    
+    seconds = diff.total_seconds()
+    
+    if seconds < 60:
+        return "Hace un momento"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        return f"Hace {minutes} min"
+    elif seconds < 86400:
+        hours = int(seconds // 3600)
+        return f"Hace {hours} h"
+    elif seconds < 604800:
+        days = int(seconds // 86400)
+        return f"Hace {days} días"
+    else:
+        return dt.strftime("%d/%m/%Y")
 
 
 def render_profile_page():
@@ -273,7 +449,127 @@ def render_admin_users_page():
     
     st.markdown("---")
     
-    st.info("🚧 **En desarrollo**: Esta página permitirá gestionar usuarios.")
+    # Obtener todos los usuarios
+    from services.auth import get_supabase_client
+    supabase = get_supabase_client()
+    
+    try:
+        result = supabase.table('users').select('*').order('created_at', desc=True).execute()
+        users = result.data if result.data else []
+    except Exception as e:
+        st.error(f"Error al cargar usuarios: {str(e)}")
+        return
+    
+    # Estadísticas
+    total_users = len(users)
+    active_users = len([u for u in users if u.get('is_active', True)])
+    admin_users = len([u for u in users if u.get('role') == 'admin'])
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("👥 Total Usuarios", total_users)
+    with col2:
+        st.metric("✅ Activos", active_users)
+    with col3:
+        st.metric("🔒 Administradores", admin_users)
+    with col4:
+        st.metric("🎓 Estudiantes", total_users - admin_users)
+    
+    st.markdown("---")
+    
+    # Filtros
+    col_search, col_filter = st.columns([2, 1])
+    with col_search:
+        search_term = st.text_input("� Buscar por nombre, email o CI:", key="admin_search")
+    with col_filter:
+        status_filter = st.selectbox("Estado:", ["Todos", "Activos", "Inactivos"], key="admin_status_filter")
+    
+    # Filtrar usuarios
+    filtered_users = users
+    
+    if search_term:
+        search_lower = search_term.lower()
+        filtered_users = [u for u in filtered_users if 
+            search_lower in u.get('nombre', '').lower() or
+            search_lower in u.get('apellido', '').lower() or
+            search_lower in u.get('email', '').lower() or
+            search_lower in u.get('ci', '').lower()
+        ]
+    
+    if status_filter == "Activos":
+        filtered_users = [u for u in filtered_users if u.get('is_active', True)]
+    elif status_filter == "Inactivos":
+        filtered_users = [u for u in filtered_users if not u.get('is_active', True)]
+    
+    st.caption(f"Mostrando {len(filtered_users)} de {total_users} usuarios")
+    
+    # Tabla de usuarios
+    for i, user in enumerate(filtered_users):
+        render_user_admin_card(user, i, supabase)
+
+
+def render_user_admin_card(user: dict, index: int, supabase):
+    """Renderiza una card de usuario para administración"""
+    from datetime import datetime
+    
+    user_id = user.get('id')
+    nombre = f"{user.get('nombre', 'N/A')} {user.get('apellido', '')}"
+    email = user.get('email', 'N/A')
+    ci = user.get('ci', 'N/A')
+    role = user.get('role', 'estudiante')
+    area = user.get('area_estudio', 'N/A')
+    is_active = user.get('is_active', True)
+    last_login = user.get('last_login', 'Nunca')
+    
+    # Formatear última conexión
+    if last_login and last_login != 'Nunca':
+        try:
+            dt = datetime.fromisoformat(last_login)
+            last_login = dt.strftime("%d/%m/%Y %H:%M")
+        except:
+            pass
+    
+    # Colores según estado
+    status_color = "#27ae60" if is_active else "#95a5a6"
+    status_text = "✅ Activo" if is_active else "⚫ Inactivo"
+    role_badge = "🔒 Admin" if role == 'admin' else "🎓 Estudiante"
+    
+    # Card
+    with st.container():
+        col1, col2, col3 = st.columns([3, 2, 1])
+        
+        with col1:
+            st.markdown(f"**{nombre}**")
+            st.caption(f"📧 {email} | 🆔 {ci}")
+        
+        with col2:
+            st.caption(f"{role_badge} | 📚 {area.capitalize() if area else 'N/A'}")
+            st.caption(f"🕐 Última conexión: {last_login}")
+        
+        with col3:
+            # Botón activar/desactivar
+            current_user = get_current_user()
+            if user_id != current_user.get('id'):  # No puede desactivarse a sí mismo
+                if is_active:
+                    if st.button("⚫ Desactivar", key=f"deactivate_{user_id}", type="secondary"):
+                        try:
+                            supabase.table('users').update({'is_active': False}).eq('id', user_id).execute()
+                            st.success(f"Usuario {nombre} desactivado")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                else:
+                    if st.button("✅ Activar", key=f"activate_{user_id}", type="primary"):
+                        try:
+                            supabase.table('users').update({'is_active': True}).eq('id', user_id).execute()
+                            st.success(f"Usuario {nombre} activado")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+            else:
+                st.caption("(Tú)")
+        
+        st.markdown("---")
 
 
 def render_admin_definitions_page():
@@ -287,7 +583,130 @@ def render_admin_definitions_page():
     
     st.markdown("---")
     
-    st.info("🚧 **En desarrollo**: Esta página permitirá editar las definiciones técnicas de las patologías.")
+    from services.auth import get_supabase_client
+    from utils.translations import translate_pathology
+    
+    supabase = get_supabase_client()
+    
+    # Lista de patologías
+    pathologies = [
+        "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", 
+        "Mass", "Nodule", "Pneumonia", "Pneumothorax", 
+        "Consolidation", "Edema", "Emphysema", "Fibrosis", 
+        "Pleural_Thickening", "Hernia"
+    ]
+    
+    # Obtener definiciones existentes
+    try:
+        result = supabase.table('pathology_definitions').select('*').execute()
+        definitions = {d['pathology_name']: d for d in result.data} if result.data else {}
+    except Exception as e:
+        st.error(f"Error al cargar definiciones: {str(e)}")
+        definitions = {}
+    
+    # Estadísticas
+    defined_count = len(definitions)
+    pending_count = len(pathologies) - defined_count
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("✅ Definidas", defined_count)
+    with col2:
+        st.metric("⏳ Pendientes", pending_count)
+    
+    st.markdown("---")
+    
+    # Selector de patología
+    selected_pathology = st.selectbox(
+        "Selecciona una patología para editar:",
+        pathologies,
+        format_func=lambda x: f"{translate_pathology(x)} ({x})" + (" ✅" if x in definitions else " ⚠️")
+    )
+    
+    st.markdown("---")
+    
+    # Formulario de edición
+    st.subheader(f"📝 {translate_pathology(selected_pathology)}")
+    
+    current_def = definitions.get(selected_pathology, {})
+    
+    with st.form(key=f"def_form_{selected_pathology}"):
+        # Definición técnica
+        technical_definition = st.text_area(
+            "Definición técnica (se muestra en resultados):",
+            value=current_def.get('technical_definition', ''),
+            height=150,
+            placeholder="Describe la patología de forma técnica pero comprensible..."
+        )
+        
+        # Descripción extendida (opcional)
+        extended_description = st.text_area(
+            "Descripción extendida (opcional):",
+            value=current_def.get('extended_description', ''),
+            height=100,
+            placeholder="Información adicional, síntomas, causas..."
+        )
+        
+        # Referencias (opcional)
+        references = st.text_input(
+            "Referencias (URLs separadas por coma):",
+            value=current_def.get('references', ''),
+            placeholder="https://ejemplo.com, https://otro.com"
+        )
+        
+        col_save, col_clear = st.columns(2)
+        
+        with col_save:
+            submit = st.form_submit_button("💾 Guardar Definición", type="primary", use_container_width=True)
+        
+        with col_clear:
+            clear = st.form_submit_button("🗑️ Limpiar", use_container_width=True)
+        
+        if submit and technical_definition.strip():
+            try:
+                # Preparar datos
+                definition_data = {
+                    'pathology_name': selected_pathology,
+                    'technical_definition': technical_definition.strip(),
+                    'extended_description': extended_description.strip() if extended_description else None,
+                    'references': references.strip() if references else None
+                }
+                
+                # Upsert (insertar o actualizar)
+                if selected_pathology in definitions:
+                    # Actualizar
+                    supabase.table('pathology_definitions')\
+                        .update(definition_data)\
+                        .eq('pathology_name', selected_pathology)\
+                        .execute()
+                    st.success(f"✅ Definición de '{translate_pathology(selected_pathology)}' actualizada")
+                else:
+                    # Insertar
+                    supabase.table('pathology_definitions')\
+                        .insert(definition_data)\
+                        .execute()
+                    st.success(f"✅ Definición de '{translate_pathology(selected_pathology)}' creada")
+                
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error al guardar: {str(e)}")
+        
+        elif submit:
+            st.warning("⚠️ La definición técnica no puede estar vacía")
+    
+    # Vista previa
+    if selected_pathology in definitions:
+        st.markdown("---")
+        st.subheader("👁️ Vista Previa")
+        
+        with st.container():
+            st.markdown(f"""
+            <div style="background: #f0f2f6; padding: 1rem; border-radius: 10px; border-left: 4px solid #1f77b4;">
+                <h4 style="color: #1f77b4; margin-bottom: 0.5rem;">{translate_pathology(selected_pathology)}</h4>
+                <p style="color: #333;">{definitions[selected_pathology].get('technical_definition', 'Sin definición')}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":

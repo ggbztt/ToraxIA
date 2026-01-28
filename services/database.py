@@ -52,6 +52,36 @@ def save_analysis_to_database(analysis_results: Dict, form_data: Dict) -> Tuple[
                 analysis_results['top_class']
             )
         
+        # Generar ID único para el análisis
+        import uuid
+        analysis_id = uuid.uuid4().hex
+        
+        # Subir imágenes a Supabase Storage
+        original_url = None
+        overlay_url = None
+        pdf_url = None
+        
+        # Intentar subir imágenes si existen
+        if 'original_image' in analysis_results and 'overlay' in analysis_results:
+            try:
+                from services.storage_service import upload_analysis_images
+                
+                original_url, overlay_url, pdf_url = upload_analysis_images(
+                    analysis_id=analysis_id,
+                    original_image=analysis_results['original_image'],
+                    overlay_image=analysis_results['overlay'],
+                    pdf_bytes=None  # PDF se puede generar después si se necesita
+                )
+                
+                if original_url and overlay_url:
+                    print(f"✅ Imágenes subidas a Supabase Storage")
+                else:
+                    print("⚠️ No se pudieron subir las imágenes, continuando sin ellas")
+                    
+            except Exception as img_error:
+                print(f"⚠️ Error subiendo imágenes: {str(img_error)}")
+                # Continuar sin imágenes, no es crítico
+        
         # Preparar datos para insertar
         analysis_data = {
             'user_id': user_id,
@@ -82,17 +112,18 @@ def save_analysis_to_database(analysis_results: Dict, form_data: Dict) -> Tuple[
             'top_probability': float(analysis_results['top_prob']),
             'predictions_json': predictions_dict,
             
-            # URLs de archivos (por ahora None, se implementará con Google Drive)
-            'original_image_url': None,
-            'overlay_image_url': None,
-            'pdf_report_url': None
+            # URLs de archivos (de Supabase Storage)
+            'original_image_url': original_url,
+            'overlay_image_url': overlay_url,
+            'pdf_report_url': pdf_url
         }
         
         # Insertar en la base de datos
         result = supabase.table('analyses').insert(analysis_data).execute()
         
         if result.data:
-            return True, f"✅ Análisis guardado exitosamente en la base de datos (ID: {result.data[0]['id'][:8]}...)"
+            images_msg = " con imágenes 📷" if original_url else " (sin imágenes)"
+            return True, f"✅ Análisis guardado exitosamente{images_msg} (ID: {result.data[0]['id'][:8]}...)"
         else:
             return False, "Error al guardar el análisis en la base de datos"
             

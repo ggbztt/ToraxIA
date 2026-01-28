@@ -9,14 +9,47 @@ from dotenv import load_dotenv
 import hashlib
 from typing import Optional, Dict, Tuple
 
-# Cargar variables de entorno
+# Cargar variables de entorno locales
 load_dotenv()
+
+
+def get_env_var(key: str) -> str:
+    """
+    Obtiene una variable de entorno.
+    Soporta tanto .env local como Streamlit Cloud secrets.
+    """
+    # Primero intentar Streamlit secrets (para Streamlit Cloud)
+    try:
+        if key in st.secrets:
+            return st.secrets[key]
+    except:
+        pass
+    
+    # Fallback a variables de entorno locales (.env)
+    return os.getenv(key)
+
 
 # Cliente de Supabase
 def get_supabase_client() -> Client:
-    """Obtiene el cliente de Supabase"""
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_ANON_KEY")
+    """Obtiene el cliente de Supabase (anon key - sujeto a RLS)"""
+    url = get_env_var("SUPABASE_URL")
+    key = get_env_var("SUPABASE_ANON_KEY")
+    return create_client(url, key)
+
+
+def get_supabase_admin_client() -> Client:
+    """
+    Obtiene el cliente de Supabase con service_role key.
+    Este cliente bypasea RLS y debe usarse solo para operaciones de backend.
+    """
+    url = get_env_var("SUPABASE_URL")
+    key = get_env_var("SUPABASE_SERVICE_ROLE_KEY")
+    
+    if not key:
+        # Fallback a anon key si no hay service role
+        print("⚠️ SUPABASE_SERVICE_ROLE_KEY no encontrada, usando ANON_KEY")
+        key = get_env_var("SUPABASE_ANON_KEY")
+    
     return create_client(url, key)
 
 

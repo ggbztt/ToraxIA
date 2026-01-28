@@ -7,7 +7,85 @@ from datetime import datetime
 from services.database import get_user_analyses
 from services.auth import get_current_user
 from utils.translations import translate_pathology
+import requests
+from io import BytesIO
+import numpy as np
+from PIL import Image
 
+
+def generate_pdf_from_history(analysis: dict) -> bytes:
+    """
+    Genera un PDF desde los datos del historial.
+    Descarga las imágenes desde las URLs de Supabase Storage.
+    
+    Args:
+        analysis: Diccionario con los datos del análisis
+    
+    Returns:
+        bytes: PDF generado, o None si falla
+    """
+    try:
+        from utils.pdf_generator import generate_report
+        
+        # Descargar imágenes desde URLs
+        original_image = None
+        overlay_image = None
+        
+        original_url = analysis.get('original_image_url')
+        overlay_url = analysis.get('overlay_image_url')
+        
+        if original_url:
+            try:
+                response = requests.get(original_url, timeout=10)
+                if response.status_code == 200:
+                    original_image = np.array(Image.open(BytesIO(response.content)))
+            except:
+                pass
+        
+        if overlay_url:
+            try:
+                response = requests.get(overlay_url, timeout=10)
+                if response.status_code == 200:
+                    overlay_image = np.array(Image.open(BytesIO(response.content)))
+            except:
+                pass
+        
+        # Preparar datos para el generador de PDF
+        predictions_dict = analysis.get('predictions_json', {})
+        class_names = list(predictions_dict.keys())
+        predictions = np.array([predictions_dict.get(name, 0) for name in class_names])
+        
+        analysis_data = {
+            'analysis_id': analysis.get('id', 'N/A'),
+            'timestamp': analysis.get('timestamp', datetime.now().isoformat()),
+            'predictions': predictions,
+            'class_names': class_names,
+            'top_class': analysis.get('top_prediction', 'N/A'),
+            'top_prob': analysis.get('top_probability', 0),
+            'original_image': original_image,
+            'overlay': overlay_image,
+            'form_data': {
+                'paciente_nombre': analysis.get('paciente_nombre', ''),
+                'paciente_apellido': analysis.get('paciente_apellido', ''),
+                'paciente_ci': analysis.get('paciente_ci', ''),
+                'paciente_edad': analysis.get('paciente_edad', ''),
+                'paciente_sexo': analysis.get('paciente_sexo', ''),
+                'academico_nombre': analysis.get('academico_nombre', ''),
+                'academico_apellido': analysis.get('academico_apellido', ''),
+                'academico_ci': analysis.get('academico_ci', ''),
+                'academico_area': analysis.get('academico_area', ''),
+                'comentario_sospecha': analysis.get('comentario_sospecha', ''),
+                'pronostico_real': analysis.get('pronostico_real', '')
+            }
+        }
+        
+        # Generar PDF
+        pdf_bytes = generate_report(analysis_data, None)
+        return pdf_bytes
+        
+    except Exception as e:
+        print(f"❌ Error generando PDF: {str(e)}")
+        return None
 
 def render_history_page():
     """Renderiza la página de historial personal"""
@@ -136,6 +214,31 @@ def render_analysis_card(analysis: dict, index: int):
         
         st.markdown("---")
         
+        # Imágenes del análisis (si existen)
+        original_url = analysis.get('original_image_url')
+        overlay_url = analysis.get('overlay_image_url')
+        
+        if original_url or overlay_url:
+            st.markdown("#### 📷 Imágenes del Análisis")
+            
+            img_col1, img_col2 = st.columns(2)
+            
+            with img_col1:
+                if original_url:
+                    st.markdown("**Radiografía Original:**")
+                    st.image(original_url, use_container_width=True)
+                else:
+                    st.info("📷 Imagen original no disponible")
+            
+            with img_col2:
+                if overlay_url:
+                    st.markdown("**Mapa de Activación (Grad-CAM):**")
+                    st.image(overlay_url, use_container_width=True)
+                else:
+                    st.info("🔥 Overlay no disponible")
+            
+            st.markdown("---")
+        
         # Predicción principal
         st.markdown("#### 🎯 Predicción Principal")
         st.markdown(f"""
@@ -199,10 +302,18 @@ def render_analysis_card(analysis: dict, index: int):
         col1, col2 = st.columns(2)
         
         with col1:
-            # Generar y descargar PDF simple
-            if st.button("📥 Descargar PDF", key=f"pdf_{index}"):
-                st.info("🚧 La descarga de PDF con imágenes estará disponible próximamente.")
-                st.write("Por ahora puedes ver todos los detalles aquí en el historial.")
+            # Generar y descargar PDF desde historial
+            pdf_bytes = generate_pdf_from_history(analysis)
+            if pdf_bytes:
+                st.download_button(
+                    label="📥 Descargar PDF",
+                    data=pdf_bytes,
+                    file_name=f"ToraxIA_Report_{analysis.get('id', 'unknown')[:8]}.pdf",
+                    mime="application/pdf",
+                    key=f"pdf_download_{index}"
+                )
+            else:
+                st.warning("⚠️ No se pudo generar el PDF")
         
         with col2:
             # Eliminar con confirmación

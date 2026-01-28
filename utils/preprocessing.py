@@ -6,6 +6,9 @@ import numpy as np
 from PIL import Image
 import streamlit as st
 
+# Tamaño de imagen esperado por el modelo
+MODEL_INPUT_SIZE = (512, 512)
+
 
 def validate_image(file) -> bool:
     """
@@ -49,13 +52,13 @@ def image_to_array(image: Image.Image) -> np.ndarray:
     return np.array(image)
 
 
-def preprocess_image(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
+def preprocess_image(image: Image.Image, target_size=MODEL_INPUT_SIZE) -> np.ndarray:
     """
     Preprocesa imagen para inferencia del modelo.
     
     Pipeline:
     1. Convertir a RGB
-    2. Redimensionar a target_size
+    2. Redimensionar a target_size (512x512 por defecto)
     3. Convertir a array numpy
     4. Normalizar a [0, 1]
     5. Agregar dimensión batch
@@ -65,7 +68,7 @@ def preprocess_image(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
         target_size: Tupla (height, width) para redimensionar
     
     Returns:
-        np.ndarray: Array con shape (1, 224, 224, 3) normalizado
+        np.ndarray: Array con shape (1, 512, 512, 3) normalizado
     """
     try:
         # 1. Asegurar RGB
@@ -81,7 +84,7 @@ def preprocess_image(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
         # 4. Normalizar a [0, 1]
         img_array = img_array.astype(np.float32) / 255.0
         
-        # 5. Agregar dimensión batch: (224, 224, 3) -> (1, 224, 224, 3)
+        # 5. Agregar dimensión batch: (512, 512, 3) -> (1, 512, 512, 3)
         img_array = np.expand_dims(img_array, axis=0)
         
         print(f"✅ Imagen preprocesada: {img_array.shape}, rango [{img_array.min():.3f}, {img_array.max():.3f}]")
@@ -93,7 +96,7 @@ def preprocess_image(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
         raise
 
 
-def preprocess_for_display(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
+def preprocess_for_display(image: Image.Image, target_size=MODEL_INPUT_SIZE) -> np.ndarray:
     """
     Preprocesa imagen solo para visualización (sin normalización)
     
@@ -102,7 +105,7 @@ def preprocess_for_display(image: Image.Image, target_size=(224, 224)) -> np.nda
         target_size: Tupla (height, width)
     
     Returns:
-        np.ndarray: Array con shape (224, 224, 3) en rango [0, 255]
+        np.ndarray: Array con shape (512, 512, 3) en rango [0, 255]
     """
     if image.mode != 'RGB':
         image = image.convert('RGB')
@@ -111,3 +114,4 @@ def preprocess_for_display(image: Image.Image, target_size=(224, 224)) -> np.nda
     img_array = np.array(image_resized)
     
     return img_array
+

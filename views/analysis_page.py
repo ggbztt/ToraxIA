@@ -116,6 +116,8 @@ def render_analysis_page():
         # Obtener modelo precargado
         model = st.session_state.model
         class_names = st.session_state.class_names
+        config = st.session_state.get('model_config', {})
+        thresholds = config.get('thresholds', {})
         
         # Contenedor de progreso
         progress_container = st.empty()
@@ -129,16 +131,16 @@ def render_analysis_page():
             
             progress_container.success("✅ Imagen preprocesada")
             
-            # Paso 2: Predicción
-            progress_container.info("⏳ **Paso 2/2**: Generando predicciones y mapas de activación...")
+            # Paso 2: Predicción + Grad-CAM
+            progress_container.info("⏳ **Paso 2/2**: Generando predicciones y Grad-CAM...")
             
             predictions = model.predict(img_array, verbose=0)[0]
             
-            saliency_map, overlay, top_class_name, top_prob = generate_activation_map_for_top_prediction(
+            heatmap, overlay, top_class_name, top_prob = generate_activation_map_for_top_prediction(
                 model, img_array, predictions, class_names
             )
             
-            # Guardar en session_state
+            # Guardar en session_state (incluir thresholds e img_array para Grad-CAM adicional)
             st.session_state.analysis_results = {
                 'predictions': predictions,
                 'class_names': class_names,
@@ -148,7 +150,9 @@ def render_analysis_page():
                 'original_image': img_display,
                 'timestamp': datetime.now().isoformat(),
                 'analysis_id': uuid.uuid4().hex,
-                'form_data': st.session_state.form_data  # Incluir datos del formulario
+                'form_data': st.session_state.form_data,  # Incluir datos del formulario
+                'thresholds': thresholds,  # Thresholds optimizados
+                'img_array': img_array  # Para generar Grad-CAM de otras clases
             }
             
             progress_container.success("✅ ¡Análisis completado exitosamente!")
@@ -368,12 +372,15 @@ def show_results(results):
         st.image(results['original_image'], use_container_width=True)
     
     with col2:
-        st.markdown("#### 🔥 Mapa de Activación")
+        st.markdown("#### 🔥 Mapa de Activación (Grad-CAM)")
         st.image(results['overlay'], use_container_width=True, caption="Regiones de mayor activación del modelo")
     
     st.markdown("---")
     
-    # Top 5 hallazgos (cambiado de 3 a 5 según requerimientos)
+    # Obtener thresholds
+    thresholds = results.get('thresholds', {})
+    
+    # Top 5 hallazgos con thresholds
     st.markdown("### 🎯 Top 5 Predicciones")
     
     # Ordenar predicciones
@@ -383,11 +390,15 @@ def show_results(results):
     sorted_indices = np.argsort(predictions)[::-1]
     top_5_indices = sorted_indices[:5]
     
-    # Mostrar top 5 en cards
+    # Mostrar top 5 en cards (lógica de thresholds se mantiene para uso interno)
     for i, idx in enumerate(top_5_indices):
         prob = predictions[idx]
         name_en = class_names[idx]  # Nombre en inglés (del modelo)
         name_es = translate_pathology(name_en)  # Traducir a español
+        
+        # Lógica de detección (para uso interno/comparativas, no se muestra en UI)
+        threshold = thresholds.get(name_en, 0.5)
+        is_detected = prob >= threshold  # Se guarda para comparativas
         
         # Emoji según ranking
         emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
@@ -395,6 +406,7 @@ def show_results(results):
         
         # Card con definición técnica para el #1
         if i == 0:
+            # Card destacada para Top 1
             st.markdown(f"""
             <div style="background-color: #e3f2fd; padding: 1.5rem; border-radius: 10px; border-left: 5px solid #1f77b4; margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
@@ -412,6 +424,7 @@ def show_results(results):
             if definition:
                 st.info(f"📚 **Definición Técnica:** {definition}")
         else:
+            # Cards normales para Top 2-5
             st.markdown(f"""
             <div style="background-color: #f0f2f6; padding: 1rem; border-radius: 10px; margin-bottom: 0.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -423,6 +436,38 @@ def show_results(results):
                 </div>
             </div>
             """, unsafe_allow_html=True)
+    
+    # Botón para ver Grad-CAM de otras predicciones
+    st.markdown("---")
+    with st.expander("🔍 Ver Grad-CAM de otras predicciones (Top 2-5)"):
+        st.info("💡 Genera mapas de activación para las otras predicciones del Top 5")
+        
+        # Solo mostrar si hay imagen preprocesada guardada
+        if 'img_array' in results:
+            img_array = results['img_array']
+            model = st.session_state.get('model')
+            
+            if model is not None:
+                from utils.activation_maps import generate_gradcam_for_class
+                
+                for i, idx in enumerate(top_5_indices[1:5], start=2):  # Top 2-5
+                    name_en = class_names[idx]
+                    name_es = translate_pathology(name_en)
+                    prob = predictions[idx]
+                    
+                    if st.button(f"Generar Grad-CAM para {name_es} ({prob*100:.1f}%)", key=f"gradcam_{idx}"):
+                        with st.spinner(f"Generando Grad-CAM para {name_es}..."):
+                            try:
+                                heatmap, overlay, _ = generate_gradcam_for_class(
+                                    model, img_array, idx, class_names
+                                )
+                                st.image(overlay, caption=f"Grad-CAM: {name_es}", use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generando Grad-CAM: {str(e)}")
+            else:
+                st.warning("⚠️ El modelo no está disponible para generar Grad-CAM adicionales")
+        else:
+            st.warning("⚠️ Los datos de imagen no están disponibles. Realiza un nuevo análisis para usar esta función.")
     
     st.markdown("---")
     

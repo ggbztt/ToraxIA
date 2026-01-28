@@ -15,7 +15,7 @@ from PIL import Image
 import io
 
 
-def generate_report(analysis_data, output_path):
+def generate_report(analysis_data, output_path=None):
     """
     Genera un reporte PDF profesional con los resultados del análisis.
     
@@ -29,21 +29,32 @@ def generate_report(analysis_data, output_path):
             - class_names: Lista de nombres de patologías
             - top_class: Nombre de la patología principal
             - top_prob: Probabilidad de la patología principal
-        output_path (str): Ruta donde guardar el PDF
+        output_path (str): Ruta donde guardar el PDF (opcional, si None genera en memoria)
     
     Returns:
         bytes: Contenido del PDF generado
     """
     
-    # Crear documento
-    doc = SimpleDocTemplate(
-        str(output_path),
-        pagesize=letter,
-        rightMargin=0.75*inch,
-        leftMargin=0.75*inch,
-        topMargin=0.75*inch,
-        bottomMargin=0.75*inch
-    )
+    # Usar BytesIO si no hay output_path
+    if output_path is None:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=0.75*inch,
+            leftMargin=0.75*inch,
+            topMargin=0.75*inch,
+            bottomMargin=0.75*inch
+        )
+    else:
+        doc = SimpleDocTemplate(
+            str(output_path),
+            pagesize=letter,
+            rightMargin=0.75*inch,
+            leftMargin=0.75*inch,
+            topMargin=0.75*inch,
+            bottomMargin=0.75*inch
+        )
     
     # Contenedor de elementos
     story = []
@@ -113,7 +124,7 @@ def generate_report(analysis_data, output_path):
     info_data = [
         ['ID de Análisis:', analysis_id],
         ['Fecha y Hora:', formatted_date],
-        ['Modelo:', 'DenseNet-121 (AUC: 0.802)']
+        ['Modelo:', 'ToraxIA v2.0']
     ]
     
     info_table = Table(info_data, colWidths=[2*inch, 4*inch])
@@ -292,8 +303,13 @@ def generate_report(analysis_data, output_path):
     # Construir PDF
     doc.build(story)
     
-    # Leer el PDF generado y retornarlo como bytes
-    with open(output_path, 'rb') as f:
-        pdf_bytes = f.read()
-    
-    return pdf_bytes
+    # Retornar bytes según el modo
+    if output_path is None:
+        # Modo en memoria - retornar desde buffer
+        buffer.seek(0)
+        return buffer.getvalue()
+    else:
+        # Modo archivo - leer y retornar
+        with open(output_path, 'rb') as f:
+            pdf_bytes = f.read()
+        return pdf_bytes

@@ -25,8 +25,12 @@ for d in [IMAGES_DIR, OVERLAYS_DIR, REPORTS_DIR]:
 DB_PATH = DB_DIR / "chest_xray.db"
 
 # --- Model Configuration ---
-MODEL_PATH = MODELS_DIR / "modelo_final.keras" # Using .keras as seen in the dir
+MODEL_PATH = MODELS_DIR / "best_model_epochs13-18.keras" 
 MODEL_CONFIG_PATH = MODELS_DIR / "model_config.json"
+THRESHOLDS_PATH = MODELS_DIR / "THRESHOLDS.json"  # Umbrales optimizados por patología
+
+# --- Grad-CAM Configuration ---
+GRADCAM_LAYER_NAME = "conv5_block16_2_conv"  # Última capa convolucional de DenseNet121
 
 # --- App Settings ---
 APP_TITLE = "ToraxIA: Diagnóstico Asistido por IA"

@@ -12,3 +12,4 @@ pandas
 numpy
 supabase
 streamlit-authenticator
+extra-streamlit-components

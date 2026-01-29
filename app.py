@@ -10,7 +10,10 @@ from pathlib import Path
 # Agregar directorio raíz al path para imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from services.auth import is_authenticated, get_current_user, logout_user, is_admin
+from services.auth import (
+    is_authenticated, get_current_user, is_admin,
+    logout_with_persistence, restore_session_from_cookie
+)
 
 
 def main():
@@ -60,6 +63,9 @@ def main():
         </style>
     """, unsafe_allow_html=True)
     
+    # RESTAURAR SESIÓN DESDE COOKIE (si existe)
+    restore_session_from_cookie()
+    
     # VERIFICAR AUTENTICACIÓN
     if not is_authenticated():
         # Mostrar página de login
@@ -82,7 +88,7 @@ def main():
                 
             except Exception as e:
                 st.error(f"❌ Error cargando el modelo: {str(e)}")
-                st.info("💡 Asegúrate de que `best_model_epochs13-18.keras` esté en la carpeta `models/`")
+                st.info("💡 Asegúrate de que `best_model.keras` esté en la carpeta `models/`")
                 st.stop()
     
     # Obtener usuario actual
@@ -116,8 +122,8 @@ def main():
         st.markdown("---")
         
         # Botón de logout
-        if st.button("🚪 Cerrar Sesión", use_container_width=True):
-            logout_user()
+        if st.button("🚪 Cerrar Sesión", width="content"):
+            logout_with_persistence()
             st.rerun()
         
         st.markdown("---")
@@ -279,7 +285,8 @@ def render_activity_feed():
         )
     
     with col_refresh:
-        if st.button("🔄 Actualizar", use_container_width=True):
+        st.markdown("<br>", unsafe_allow_html=True)  # Espaciador para alinear
+        if st.button("🔄 Actualizar", width="content"):
             st.rerun()
     
     st.markdown("---")
@@ -375,7 +382,7 @@ def render_activity_card(analysis: dict, index: int):
         
         with col1:
             if overlay_url:
-                st.image(overlay_url, caption="Mapa de Activación", use_container_width=True)
+                st.image(overlay_url, caption="Mapa de Activación", width="content")
             else:
                 st.info("📷 Sin imagen")
         
@@ -657,10 +664,10 @@ def render_admin_definitions_page():
         col_save, col_clear = st.columns(2)
         
         with col_save:
-            submit = st.form_submit_button("💾 Guardar Definición", type="primary", use_container_width=True)
+            submit = st.form_submit_button("💾 Guardar Definición", type="primary", width="content")
         
         with col_clear:
-            clear = st.form_submit_button("🗑️ Limpiar", use_container_width=True)
+            clear = st.form_submit_button("🗑️ Limpiar", width="content")
         
         if submit and technical_definition.strip():
             try:

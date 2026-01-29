@@ -42,8 +42,9 @@ def render_analysis_page():
         
         with col1:
             st.markdown("**Datos del Paciente:**")
-            st.write(f"- Nombre: {form_data['paciente_nombre']} {form_data['paciente_apellido']}")
+            st.write(f"- Nombre: {form_data['paciente_nombre']}")
             st.write(f"- CI: {form_data['paciente_ci']}")
+            st.write(f"- Apellido: {form_data['paciente_apellido']}")
             st.write(f"- Edad: {form_data['paciente_edad']} años")
             st.write(f"- Sexo: {form_data['paciente_sexo']}")
             if form_data['paciente_peso']:
@@ -51,8 +52,9 @@ def render_analysis_page():
         
         with col2:
             st.markdown("**Datos Académicos:**")
-            st.write(f"- Estudiante: {form_data['academico_nombre']} {form_data['academico_apellido']}")
+            st.write(f"- Estudiante: {form_data['academico_nombre']}")
             st.write(f"- CI: {form_data['academico_ci']}")
+            st.write(f"- Apellido: {form_data['academico_apellido']}")
             st.write(f"- Área: {form_data['academico_area'].capitalize()}")
             
         if form_data['comentario_sospecha']:
@@ -100,7 +102,7 @@ def render_analysis_page():
     
     with col1:
         st.markdown("#### 📷 Vista Previa")
-        st.image(image, use_container_width=True)
+        st.image(image, width="content")
     
     with col2:
         st.markdown("#### ℹ️ Información")
@@ -111,7 +113,7 @@ def render_analysis_page():
     st.markdown("---")
     
     # Botón de análisis
-    if st.button("🔬 Analizar Radiografía", type="primary", use_container_width=True):
+    if st.button("🔬 Analizar Radiografía", type="primary", width="content"):
         
         # Obtener modelo precargado
         model = st.session_state.model
@@ -183,36 +185,45 @@ def render_pre_diagnosis_form(user):
         # ============================================
         st.markdown("#### 👤 Datos del Paciente")
         
+        # Fila 1: Nombre y Apellido
         col1, col2 = st.columns(2)
-        
         with col1:
             paciente_nombre = st.text_input(
                 "Nombre *",
                 placeholder="Juan",
                 help="Nombre del paciente"
             )
-            paciente_ci = st.text_input(
-                "Cédula de Identidad *",
-                placeholder="12345678",
-                help="CI del paciente"
-            )
-            paciente_sexo = st.selectbox(
-                "Sexo *",
-                options=["M", "F", "Otro"],
-                format_func=lambda x: {"M": "Masculino", "F": "Femenino", "Otro": "Otro"}[x]
-            )
-        
         with col2:
             paciente_apellido = st.text_input(
                 "Apellido *",
                 placeholder="Pérez",
                 help="Apellido del paciente"
             )
+        
+        # Fila 2: Cédula y Edad
+        col1, col2 = st.columns(2)
+        with col1:
+            paciente_ci = st.text_input(
+                "Cédula de Identidad *",
+                placeholder="12345678",
+                help="CI del paciente"
+            )
+        with col2:
             paciente_edad = st.text_input(
                 "Edad (años) *",
                 placeholder="30",
                 help="Edad del paciente en años"
             )
+        
+        # Fila 3: Sexo y Peso
+        col1, col2 = st.columns(2)
+        with col1:
+            paciente_sexo = st.selectbox(
+                "Sexo *",
+                options=["M", "F", "Otro"],
+                format_func=lambda x: {"M": "Masculino", "F": "Femenino", "Otro": "Otro"}[x]
+            )
+        with col2:
             paciente_peso = st.text_input(
                 "Peso (kg) - Opcional",
                 placeholder="70",
@@ -236,17 +247,17 @@ def render_pre_diagnosis_form(user):
                 disabled=True,
                 help="Autocompletado desde tu perfil"
             )
-            academico_ci = st.text_input(
-                "CI del Estudiante *",
-                value=user['ci'],
+            academico_apellido = st.text_input(
+                "Apellido del Estudiante *",
+                value=user['apellido'],
                 disabled=True,
                 help="Autocompletado desde tu perfil"
             )
         
         with col2:
-            academico_apellido = st.text_input(
-                "Apellido del Estudiante *",
-                value=user['apellido'],
+            academico_ci = st.text_input(
+                "CI del Estudiante *",
+                value=user['ci'],
                 disabled=True,
                 help="Autocompletado desde tu perfil"
             )
@@ -290,7 +301,7 @@ def render_pre_diagnosis_form(user):
         submitted = st.form_submit_button(
             "✅ Continuar con el Análisis",
             type="primary",
-            use_container_width=True
+            width="content"
         )
         
         if submitted:
@@ -369,11 +380,11 @@ def show_results(results):
     
     with col1:
         st.markdown("#### 📷 Radiografía Original")
-        st.image(results['original_image'], use_container_width=True)
+        st.image(results['original_image'], width="content")
     
     with col2:
         st.markdown("#### 🔥 Mapa de Activación (Grad-CAM)")
-        st.image(results['overlay'], use_container_width=True, caption="Regiones de mayor activación del modelo")
+        st.image(results['overlay'], width="content", caption="Regiones de mayor activación del modelo")
     
     st.markdown("---")
     
@@ -461,7 +472,7 @@ def show_results(results):
                                 heatmap, overlay, _ = generate_gradcam_for_class(
                                     model, img_array, idx, class_names
                                 )
-                                st.image(overlay, caption=f"Grad-CAM: {name_es}", use_container_width=True)
+                                st.image(overlay, caption=f"Grad-CAM: {name_es}", width="content")
                             except Exception as e:
                                 st.error(f"Error generando Grad-CAM: {str(e)}")
             else:
@@ -551,7 +562,7 @@ def show_results(results):
     
     st.dataframe(
         df,
-        use_container_width=True,
+        width="content",
         hide_index=False,
         column_config={
             "Patología": st.column_config.TextColumn("Patología", width="medium"),

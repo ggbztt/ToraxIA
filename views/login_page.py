@@ -2,7 +2,7 @@
 Página de Login y Registro
 """
 import streamlit as st
-from services.auth import register_user, login_user
+from services.auth import register_user, login_with_persistence
 import re
 
 
@@ -38,7 +38,7 @@ def render_login_page():
             email = st.text_input("📧 Email", placeholder="tu@email.com")
             password = st.text_input("🔒 Contraseña", type="password")
             
-            submit = st.form_submit_button("Iniciar Sesión", type="primary", use_container_width=True)
+            submit = st.form_submit_button("Iniciar Sesión", type="primary", width="content")
             
             if submit:
                 if not email or not password:
@@ -47,16 +47,10 @@ def render_login_page():
                     st.error("❌ Email inválido")
                 else:
                     with st.spinner("🔄 Verificando credenciales..."):
-                        success, user, message = login_user(email, password)
+                        # Usar login_with_persistence para guardar cookie
+                        success, user, message = login_with_persistence(email, password)
                         
                         if success:
-                            # Guardar en session_state
-                            st.session_state.authenticated = True
-                            st.session_state.user = user
-                            st.session_state.user_id = user['id']
-                            st.session_state.user_role = user['role']
-                            st.session_state.user_name = f"{user['nombre']} {user['apellido']}"
-                            
                             st.success(f"✅ {message}")
                             st.balloons()
                             st.rerun()
@@ -95,7 +89,7 @@ def render_login_page():
             
             st.markdown("---")
             
-            submit = st.form_submit_button("Registrarse", type="primary", use_container_width=True)
+            submit = st.form_submit_button("Registrarse", type="primary", width="content")
             
             if submit:
                 # Validaciones

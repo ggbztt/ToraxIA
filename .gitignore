@@ -12,10 +12,10 @@ env/
 .env
 .streamlit/secrets.toml
 
-# Model files (muy grandes para Git)
-models/*.h5
-models/*.keras
-models/*.hdf5
+# # Model files (muy grandes para Git)
+# models/*.h5
+# models/*.keras
+# models/*.hdf5
 
 # Logs
 *.log

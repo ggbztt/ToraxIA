@@ -253,3 +253,131 @@ def update_user_profile(user_id: str, updates: Dict) -> Tuple[bool, str]:
             
     except Exception as e:
         return False, f"Error: {str(e)}"
+
+
+# ============================================
+# PERSISTENCIA DE SESIÓN CON QUERY PARAMS
+# ============================================
+
+import base64
+from datetime import datetime, timedelta
+
+# Clave para el parámetro de sesión
+SESSION_PARAM_KEY = "session"
+SESSION_TIMEOUT_MINUTES = 10# Timeout de sesión en minutos
+
+
+def _encode_session(user_id: str) -> str:
+    """Codifica el user_id + timestamp para almacenamiento seguro"""
+    timestamp = datetime.now().isoformat()
+    data = f"{user_id}|{timestamp}"
+    return base64.b64encode(data.encode()).decode()
+
+
+def _decode_session(encoded: str) -> Tuple[Optional[str], Optional[datetime]]:
+    """Decodifica el user_id y timestamp"""
+    try:
+        data = base64.b64decode(encoded.encode()).decode()
+        parts = data.split("|")
+        if len(parts) >= 2:
+            user_id = parts[0]
+            timestamp = datetime.fromisoformat(parts[1])
+            return user_id, timestamp
+        return None, None
+    except:
+        return None, None
+
+
+def _is_session_expired(timestamp: datetime) -> bool:
+    """Verifica si la sesión ha expirado (más de 12 minutos)"""
+    if timestamp is None:
+        return True
+    elapsed = datetime.now() - timestamp
+    return elapsed > timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+
+
+def restore_session_from_cookie() -> bool:
+    """
+    Intenta restaurar la sesión usando query params.
+    Esta función verifica si hay un session token en la URL y si no ha expirado.
+    Retorna True si se restauró exitosamente.
+    """
+    # Si ya está autenticado, no hacer nada
+    if is_authenticated():
+        return True
+    
+    # Verificar query params
+    try:
+        params = st.query_params
+        if SESSION_PARAM_KEY in params:
+            encoded_session = params[SESSION_PARAM_KEY]
+            user_id, timestamp = _decode_session(encoded_session)
+            
+            if user_id and timestamp:
+                # Verificar si la sesión ha expirado
+                if _is_session_expired(timestamp):
+                    # Sesión expirada, limpiar
+                    del st.query_params[SESSION_PARAM_KEY]
+                    st.warning(f"⏰ Tu sesión ha expirado después de {SESSION_TIMEOUT_MINUTES} minutos de inactividad. Por favor inicia sesión nuevamente.")
+                    return False
+                
+                user = get_user_by_id(user_id)
+                
+                if user and user.get('is_active', True):
+                    # Restaurar sesión y renovar timestamp
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.user_id = user['id']
+                    st.session_state.user_role = user.get('role', 'estudiante')
+                    st.session_state.user_name = f"{user['nombre']} {user['apellido']}"
+                    
+                    # Renovar el timestamp para extender la sesión
+                    new_encoded = _encode_session(user_id)
+                    st.query_params[SESSION_PARAM_KEY] = new_encoded
+                    
+                    return True
+    except Exception as e:
+        print(f"Error restaurando sesión: {e}")
+    
+    return False
+
+
+def login_with_persistence(email: str, password: str) -> Tuple[bool, Optional[Dict], str]:
+    """
+    Login que también guarda el token en query params para persistencia.
+    """
+    success, user, message = login_user(email, password)
+    
+    if success and user:
+        # Guardar sesión en session_state
+        st.session_state.authenticated = True
+        st.session_state.user = user
+        st.session_state.user_id = user['id']
+        st.session_state.user_role = user.get('role', 'estudiante')
+        st.session_state.user_name = f"{user['nombre']} {user['apellido']}"
+        
+        # Guardar en query params para persistencia (con timestamp)
+        try:
+            encoded = _encode_session(user['id'])
+            st.query_params[SESSION_PARAM_KEY] = encoded
+        except Exception as e:
+            print(f"Advertencia: No se pudo guardar sesión en URL: {e}")
+    
+    return success, user, message
+
+
+def logout_with_persistence():
+    """
+    Logout que también elimina el token de query params.
+    """
+    # Limpiar query params
+    try:
+        if SESSION_PARAM_KEY in st.query_params:
+            del st.query_params[SESSION_PARAM_KEY]
+    except Exception as e:
+        print(f"Advertencia: No se pudo limpiar query params: {e}")
+    
+    # Limpiar session_state
+    logout_user()
+
+

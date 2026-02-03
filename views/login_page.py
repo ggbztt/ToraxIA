@@ -13,8 +13,20 @@ def validate_email(email: str) -> bool:
 
 
 def validate_ci(ci: str) -> bool:
-    """Valida formato de cédula (solo números, 6-10 dígitos)"""
-    return ci.isdigit() and 6 <= len(ci) <= 10
+    """Valida formato de cédula (solo números, 7-8 dígitos)"""
+    return ci.isdigit() and 7 <= len(ci) <= 8
+
+
+def validate_name(name: str) -> bool:
+    """
+    Valida que el nombre solo contenga letras, espacios y acentos.
+    No permite números ni caracteres especiales como !@#$%
+    """
+    if not name or len(name.strip()) < 2:
+        return False
+    # Permite letras (incluyendo acentos), espacios y guiones
+    pattern = r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s\-]+$'
+    return re.match(pattern, name.strip()) is not None
 
 
 def render_login_page():
@@ -65,17 +77,26 @@ def render_login_page():
         
         with st.form("register_form"):
             col1, col2 = st.columns(2)
-            
             with col1:
                 nombre = st.text_input("👤 Nombre", placeholder="Juan")
-                email = st.text_input("📧 Email", placeholder="tu@email.com")
-                ci = st.text_input("🆔 Cédula de Identidad", placeholder="12345678")
-            
             with col2:
                 apellido = st.text_input("👤 Apellido", placeholder="Pérez")
+            
+            # Fila 2: Email y Cédula
+            col1, col2 = st.columns(2)
+            with col1:
+                email = st.text_input("📧 Email", placeholder="tu@email.com")
+            with col2:
+                ci = st.text_input("🆔 Cédula de Identidad", placeholder="12345678")
+            
+            # Fila 3: Contraseñas
+            col1, col2 = st.columns(2)
+            with col1:
                 password = st.text_input("🔒 Contraseña", type="password", help="Mínimo 8 caracteres")
+            with col2:
                 password_confirm = st.text_input("🔒 Confirmar Contraseña", type="password")
             
+            # Área de estudio
             area_estudio = st.selectbox(
                 "🎓 Área de Estudio",
                 options=["radiologia", "medicina", "enfermeria", "otro"],
@@ -98,11 +119,17 @@ def render_login_page():
                 if not all([nombre, apellido, email, password, password_confirm, ci]):
                     errors.append("Por favor completa todos los campos")
                 
+                if not validate_name(nombre):
+                    errors.append("Nombre inválido (solo letras, sin números ni caracteres especiales)")
+                
+                if not validate_name(apellido):
+                    errors.append("Apellido inválido (solo letras, sin números ni caracteres especiales)")
+                
                 if not validate_email(email):
                     errors.append("Email inválido")
                 
                 if not validate_ci(ci):
-                    errors.append("Cédula inválida (debe contener solo números, 6-10 dígitos)")
+                    errors.append("Cédula inválida (debe contener solo números, 7-8 dígitos)")
                 
                 if len(password) < 8:
                     errors.append("La contraseña debe tener al menos 8 caracteres")

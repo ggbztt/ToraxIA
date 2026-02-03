@@ -516,15 +516,19 @@ def render_admin_users_page():
 
 
 def render_user_admin_card(user: dict, index: int, supabase):
-    """Renderiza una card de usuario para administración"""
+    """Renderiza una card de usuario para administración con edición completa"""
     from datetime import datetime
+    from services.auth import hash_password
+    import secrets
+    import string
     
     user_id = user.get('id')
-    nombre = f"{user.get('nombre', 'N/A')} {user.get('apellido', '')}"
+    nombre = user.get('nombre', 'N/A')
+    apellido = user.get('apellido', '')
     email = user.get('email', 'N/A')
     ci = user.get('ci', 'N/A')
     role = user.get('role', 'estudiante')
-    area = user.get('area_estudio', 'N/A')
+    area = user.get('area_estudio', 'radiologia')
     is_active = user.get('is_active', True)
     last_login = user.get('last_login', 'Nunca')
     
@@ -537,44 +541,158 @@ def render_user_admin_card(user: dict, index: int, supabase):
             pass
     
     # Colores según estado
-    status_color = "#27ae60" if is_active else "#95a5a6"
     status_text = "✅ Activo" if is_active else "⚫ Inactivo"
     role_badge = "🔒 Admin" if role == 'admin' else "🎓 Estudiante"
     
     # Card
     with st.container():
-        col1, col2, col3 = st.columns([3, 2, 1])
+        col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
         
         with col1:
-            st.markdown(f"**{nombre}**")
+            st.markdown(f"**{nombre} {apellido}**")
             st.caption(f"📧 {email} | 🆔 {ci}")
         
         with col2:
             st.caption(f"{role_badge} | 📚 {area.capitalize() if area else 'N/A'}")
             st.caption(f"🕐 Última conexión: {last_login}")
         
+        current_user = get_current_user()
+        is_self = user_id == current_user.get('id')
+        
         with col3:
+            # Botón editar
+            if not is_self:
+                if st.button("✏️ Editar", key=f"edit_{user_id}", type="secondary"):
+                    st.session_state[f"editing_user_{user_id}"] = True
+            else:
+                st.caption("(Tú)")
+        
+        with col4:
             # Botón activar/desactivar
-            current_user = get_current_user()
-            if user_id != current_user.get('id'):  # No puede desactivarse a sí mismo
+            if not is_self:
                 if is_active:
-                    if st.button("⚫ Desactivar", key=f"deactivate_{user_id}", type="secondary"):
+                    if st.button("⚫", key=f"deactivate_{user_id}", help="Desactivar usuario"):
                         try:
                             supabase.table('users').update({'is_active': False}).eq('id', user_id).execute()
-                            st.success(f"Usuario {nombre} desactivado")
+                            st.success(f"Usuario desactivado")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
                 else:
-                    if st.button("✅ Activar", key=f"activate_{user_id}", type="primary"):
+                    if st.button("✅", key=f"activate_{user_id}", help="Activar usuario"):
                         try:
                             supabase.table('users').update({'is_active': True}).eq('id', user_id).execute()
-                            st.success(f"Usuario {nombre} activado")
+                            st.success(f"Usuario activado")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
-            else:
-                st.caption("(Tú)")
+        
+        # Formulario de edición expandible
+        if st.session_state.get(f"editing_user_{user_id}", False):
+            with st.expander("📝 Editar Usuario", expanded=True):
+                with st.form(key=f"edit_form_{user_id}"):
+                    st.markdown(f"**Editando:** {nombre} {apellido}")
+                    
+                    # Campos editables
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        new_nombre = st.text_input("Nombre", value=nombre, key=f"name_{user_id}")
+                        new_email = st.text_input("Email", value=email, key=f"email_{user_id}", 
+                                                  help="⚠️ Cambiar email afecta el login del usuario")
+                        new_role = st.selectbox("Rol", options=["estudiante", "admin"],
+                                               index=0 if role == "estudiante" else 1,
+                                               key=f"role_{user_id}")
+                    
+                    with col_b:
+                        new_apellido = st.text_input("Apellido", value=apellido, key=f"apellido_{user_id}")
+                        new_ci = st.text_input("Cédula", value=ci, key=f"ci_{user_id}")
+                        new_area = st.selectbox("Área de Estudio", 
+                                               options=["radiologia", "medicina", "enfermeria", "otro"],
+                                               index=["radiologia", "medicina", "enfermeria", "otro"].index(area) if area in ["radiologia", "medicina", "enfermeria", "otro"] else 0,
+                                               key=f"area_{user_id}")
+                    
+                    st.markdown("---")
+                    
+                    # Botones de acción
+                    col_save, col_reset, col_cancel = st.columns(3)
+                    
+                    with col_save:
+                        save_btn = st.form_submit_button("💾 Guardar Cambios", type="primary")
+                    
+                    with col_reset:
+                        reset_btn = st.form_submit_button("🔑 Resetear Contraseña")
+                    
+                    with col_cancel:
+                        cancel_btn = st.form_submit_button("❌ Cancelar")
+                    
+                    if save_btn:
+                        # Validaciones
+                        import re
+                        
+                        def validate_name(name):
+                            if not name or len(name.strip()) < 2:
+                                return False
+                            pattern = r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s\-]+$'
+                            return re.match(pattern, name.strip()) is not None
+                            
+                        def validate_email(email):
+                            pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                            return re.match(pattern, email) is not None
+                            
+                        def validate_ci(ci):
+                            return ci.isdigit() and 7 <= len(ci) <= 8
+                        
+                        errors = []
+                        if not validate_name(new_nombre):
+                            errors.append("Nombre inválido (solo letras, sin números ni caracteres especiales)")
+                        
+                        if not validate_name(new_apellido):
+                            errors.append("Apellido inválido (solo letras, sin números ni caracteres especiales)")
+                        
+                        if not validate_email(new_email):
+                            errors.append("Email inválido (formato incorrecto)")
+                            
+                        if not validate_ci(new_ci):
+                            errors.append("Cédula inválida (solo números, 7-8 dígitos)")
+                            
+                        if errors:
+                            for error in errors:
+                                st.error(f"❌ {error}")
+                        else:
+                            try:
+                                # Actualizar datos
+                                updates = {
+                                    'nombre': new_nombre.strip(),
+                                    'apellido': new_apellido.strip(),
+                                    'email': new_email.strip(),
+                                    'ci': new_ci.strip(),
+                                    'area_estudio': new_area,
+                                    'role': new_role
+                                }
+                                supabase.table('users').update(updates).eq('id', user_id).execute()
+                                st.success(f"✅ Usuario actualizado correctamente")
+                                del st.session_state[f"editing_user_{user_id}"]
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Error al actualizar: {str(e)}")
+                    
+                    if reset_btn:
+                        try:
+                            # Generar contraseña temporal
+                            temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(10))
+                            password_hash = hash_password(temp_password)
+                            
+                            supabase.table('users').update({'password_hash': password_hash}).eq('id', user_id).execute()
+                            
+                            st.success(f"✅ Contraseña reseteada")
+                            st.info(f"🔑 **Nueva contraseña temporal:** `{temp_password}`")
+                            st.warning("⚠️ Comparte esta contraseña con el usuario de forma segura. Solo se muestra una vez.")
+                        except Exception as e:
+                            st.error(f"❌ Error al resetear contraseña: {str(e)}")
+                    
+                    if cancel_btn:
+                        del st.session_state[f"editing_user_{user_id}"]
+                        st.rerun()
         
         st.markdown("---")
 

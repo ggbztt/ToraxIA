@@ -264,7 +264,7 @@ def render_pre_diagnosis_form(user):
             academico_area = st.selectbox(
                 "Área de Estudio *",
                 options=["radiologia", "medicina", "enfermeria", "otro"],
-                index=["radiologia", "medicina", "enfermeria"].index(user['area_estudio']) if user['area_estudio'] else 0,
+                index=["radiologia", "medicina", "enfermeria", "otro"].index(user['area_estudio']) if user['area_estudio'] in ["radiologia", "medicina", "enfermeria", "otro"] else 0,
                 format_func=lambda x: {
                     "radiologia": "Radiología",
                     "medicina": "Medicina",
@@ -308,14 +308,22 @@ def render_pre_diagnosis_form(user):
             # Validaciones
             errors = []
             
-            # Validar nombres (solo letras y espacios)
+            # Función para validar nombres (letras, espacios, acentos, guiones)
+            import re
+            def validate_name(name):
+                if not name or len(name.strip()) < 2:
+                    return False
+                pattern = r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s\-]+$'
+                return re.match(pattern, name.strip()) is not None
+            
+            # Validar nombres (solo letras, espacios, acentos y guiones)
             if not paciente_nombre or not paciente_apellido:
                 errors.append("El nombre y apellido del paciente son obligatorios")
             else:
-                if not paciente_nombre.replace(" ", "").isalpha():
-                    errors.append("El nombre del paciente solo puede contener letras")
-                if not paciente_apellido.replace(" ", "").isalpha():
-                    errors.append("El apellido del paciente solo puede contener letras")
+                if not validate_name(paciente_nombre):
+                    errors.append("El nombre del paciente solo puede contener letras (sin números ni caracteres especiales)")
+                if not validate_name(paciente_apellido):
+                    errors.append("El apellido del paciente solo puede contener letras (sin números ni caracteres especiales)")
             
             # Validar cédula (solo números, 7-8 dígitos)
             if not paciente_ci:
@@ -332,7 +340,7 @@ def render_pre_diagnosis_form(user):
                 errors.append("La edad debe ser un número")
             else:
                 edad_num = int(paciente_edad)
-                if edad_num < 1 or edad_num > 120:
+                if edad_num < 8 or edad_num > 120:
                     errors.append("La edad debe estar entre 1 y 120 años")
             
             # Validar peso (opcional, pero si se ingresa debe ser válido)

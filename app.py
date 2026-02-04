@@ -97,6 +97,10 @@ def main():
     
     # Sidebar - Navegación
     with st.sidebar:
+        # Logo de ToraxIA
+        st.image("toraxia_logo/toraxia-high-resolution-logo-transparent.png", use_container_width=True)
+        st.markdown("---")
+        
         # Info del usuario
         st.markdown(f"### 👤 {user['nombre']} {user['apellido']}")
         st.caption(f"**Rol:** {user_role.capitalize()}")
@@ -152,8 +156,8 @@ def render_home_page():
     
     user = get_current_user()
     
-    st.markdown('<div class="main-header">🩻 ToraxIA</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sub-header">Bienvenido/a, {user["nombre"]}!</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="main-header">Bienvenido/a, {user["nombre"]}!</div>', unsafe_allow_html=True)
     
     st.markdown("---")
     

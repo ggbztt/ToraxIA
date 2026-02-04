@@ -32,7 +32,11 @@ def validate_name(name: str) -> bool:
 def render_login_page():
     """Renderiza la página de login/registro"""
     
-    st.markdown('<div class="main-header">🩻 ToraxIA</div>', unsafe_allow_html=True)
+    # Logo centrado
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image("toraxia_logo/toraxia-high-resolution-logo-transparent.png", use_container_width=True)
+    
     st.markdown('<div class="sub-header">Sistema de Diagnóstico Asistido por IA</div>', unsafe_allow_html=True)
     
     st.markdown("---")

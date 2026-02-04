@@ -106,8 +106,20 @@ def generate_report(analysis_data, output_path=None):
         spaceAfter=10
     )
     
-    # === HEADER ===
-    story.append(Paragraph("🩻 ToraxIA", title_style))
+    # === HEADER CON LOGO ===
+    # Agregar logo de ToraxIA
+    from pathlib import Path
+    logo_path = Path(__file__).parent.parent / "toraxia_logo" / "toraxia-high-resolution-logo-transparent.png"
+    if logo_path.exists():
+        logo_img = RLImage(str(logo_path), width=3*inch, height=0.75*inch)
+        logo_table = Table([[logo_img]], colWidths=[6*inch])
+        logo_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ]))
+        story.append(logo_table)
+    else:
+        story.append(Paragraph("ToraxIA", title_style))
+    
     story.append(Paragraph("Reporte de Análisis de Radiografía Torácica", subtitle_style))
     story.append(Spacer(1, 0.2*inch))
     

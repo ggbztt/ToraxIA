@@ -238,18 +238,32 @@ def generate_report(analysis_data, output_path=None):
     predictions = analysis_data.get('predictions', [])
     class_names = analysis_data.get('class_names', [])
     
+    # Función para determinar nivel de riesgo (texto solamente para PDF)
+    def get_risk_level_text(probability):
+        """Retorna texto del nivel según el porcentaje"""
+        prob_pct = probability * 100
+        if prob_pct < 25:
+            return "BAJO"
+        elif prob_pct < 50:
+            return "MODERADO"
+        elif prob_pct < 75:
+            return "ALTO"
+        else:
+            return "MUY ALTO"
+    
     # Ordenar por probabilidad
     sorted_indices = np.argsort(predictions)[::-1]
     
-    # Crear tabla
-    table_data = [['Patología', 'Probabilidad']]
+    # Crear tabla con columna de Nivel
+    table_data = [['Patología', 'Probabilidad', 'Nivel']]
     
     for idx in sorted_indices:
         prob = predictions[idx]
         name = class_names[idx]
-        table_data.append([name, f"{prob*100:.2f}%"])
+        level = get_risk_level_text(prob)
+        table_data.append([name, f"{prob*100:.2f}%", level])
     
-    prob_table = Table(table_data, colWidths=[4*inch, 2*inch])
+    prob_table = Table(table_data, colWidths=[3.5*inch, 1.5*inch, 1.3*inch])
     prob_table.setStyle(TableStyle([
         # Header
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -264,6 +278,7 @@ def generate_report(analysis_data, output_path=None):
         ('FONTSIZE', (0, 1), (-1, -1), 10),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
         ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
         ('PADDING', (0, 1), (-1, -1), 6),

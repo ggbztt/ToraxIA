@@ -272,6 +272,19 @@ def render_analysis_card(analysis: dict, index: int):
             
             predictions_dict = analysis['predictions_json']
             
+            # Función para determinar nivel de riesgo
+            def get_risk_level(probability):
+                """Retorna emoji, texto y color según el porcentaje"""
+                prob_pct = probability * 100
+                if prob_pct < 25:
+                    return "🟢", "BAJO", "#27ae60"
+                elif prob_pct < 50:
+                    return "🟡", "MODERADO", "#f1c40f"
+                elif prob_pct < 75:
+                    return "🟠", "ALTO", "#e67e22"
+                else:
+                    return "🔴", "MUY ALTO", "#e74c3c"
+            
             # Ordenar por probabilidad
             sorted_predictions = sorted(
                 predictions_dict.items(),
@@ -282,6 +295,7 @@ def render_analysis_card(analysis: dict, index: int):
             for rank, (pathology_en, prob) in enumerate(sorted_predictions, 1):
                 pathology_es = translate_pathology(pathology_en)
                 emoji = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][rank-1]
+                risk_emoji, risk_text, risk_color = get_risk_level(prob)
                 
                 st.markdown(f"""
                 <div style="background-color: #f0f2f6; padding: 0.5rem 1rem; border-radius: 5px; margin-bottom: 0.3rem;">
@@ -291,7 +305,10 @@ def render_analysis_card(analysis: dict, index: int):
                             <span style="font-weight: bold;">{pathology_es}</span>
                             <span style="color: #666; font-size: 0.85rem;"> ({pathology_en})</span>
                         </div>
-                        <div style="font-size: 1.1rem; font-weight: bold; color: #1f77b4;">{prob*100:.1f}%</div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.1rem; font-weight: bold; color: #1f77b4;">{prob*100:.1f}%</span>
+                            <span style="background-color: {risk_color}; color: white; padding: 0.15rem 0.4rem; border-radius: 10px; font-weight: bold; font-size: 0.75rem;">{risk_emoji} {risk_text}</span>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)

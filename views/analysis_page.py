@@ -409,6 +409,19 @@ def show_results(results):
     sorted_indices = np.argsort(predictions)[::-1]
     top_5_indices = sorted_indices[:5]
     
+    # Función para determinar nivel de riesgo
+    def get_risk_level(probability):
+        """Retorna emoji, texto y color según el porcentaje"""
+        prob_pct = probability * 100
+        if prob_pct < 25:
+            return "🟢", "BAJO", "#27ae60"
+        elif prob_pct < 50:
+            return "🟡", "MODERADO", "#f1c40f"
+        elif prob_pct < 75:
+            return "🟠", "ALTO", "#e67e22"
+        else:
+            return "🔴", "MUY ALTO", "#e74c3c"
+    
     # Mostrar top 5 en cards (lógica de thresholds se mantiene para uso interno)
     for i, idx in enumerate(top_5_indices):
         prob = predictions[idx]
@@ -423,6 +436,9 @@ def show_results(results):
         emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         emoji = emojis[i]
         
+        # Obtener nivel de riesgo
+        risk_emoji, risk_text, risk_color = get_risk_level(prob)
+        
         # Card con definición técnica para el #1
         if i == 0:
             # Card destacada para Top 1
@@ -430,9 +446,12 @@ def show_results(results):
             <div style="background-color: #e3f2fd; padding: 1.5rem; border-radius: 10px; border-left: 5px solid #1f77b4; margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
                     <div style="font-size: 2rem; margin-right: 1rem;">{emoji}</div>
-                    <div>
+                    <div style="flex-grow: 1;">
                         <div style="font-size: 1.5rem; font-weight: bold;">{name_es}</div>
-                        <div style="font-size: 2rem; color: #1f77b4; font-weight: bold;">{prob*100:.1f}%</div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span style="font-size: 2rem; color: #1f77b4; font-weight: bold;">{prob*100:.1f}%</span>
+                            <span style="background-color: {risk_color}; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: bold; font-size: 0.9rem;">{risk_emoji} {risk_text}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -451,7 +470,10 @@ def show_results(results):
                         <div style="font-size: 1.5rem; margin-right: 1rem;">{emoji}</div>
                         <div style="font-size: 1.1rem; font-weight: bold;">{name_es}</div>
                     </div>
-                    <div style="font-size: 1.5rem; color: #1f77b4; font-weight: bold;">{prob*100:.1f}%</div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-size: 1.5rem; color: #1f77b4; font-weight: bold;">{prob*100:.1f}%</span>
+                        <span style="background-color: {risk_color}; color: white; padding: 0.2rem 0.5rem; border-radius: 15px; font-weight: bold; font-size: 0.8rem;">{risk_emoji} {risk_text}</span>
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -560,9 +582,13 @@ def show_results(results):
     # Traducir nombres de patologías a español
     class_names_es = [translate_pathology(name) for name in class_names]
     
+    # Crear lista de niveles de riesgo
+    niveles = [get_risk_level(prob)[1] for prob in predictions]  # [1] es el texto del nivel
+    
     df = pd.DataFrame({
         'Patología': class_names_es,  # Usar nombres en español
-        'Probabilidad': predictions
+        'Probabilidad': predictions,
+        'Nivel': niveles
     })
     
     df = df.sort_values('Probabilidad', ascending=False).reset_index(drop=True)
@@ -575,6 +601,7 @@ def show_results(results):
         column_config={
             "Patología": st.column_config.TextColumn("Patología", width="medium"),
             "Probabilidad": st.column_config.TextColumn("Probabilidad", width="small"),
+            "Nivel": st.column_config.TextColumn("Nivel", width="small"),
         }
     )
     

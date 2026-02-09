@@ -91,7 +91,8 @@ def generate_report(analysis_data, output_path=None):
         textColor=colors.HexColor('#1f77b4'),
         spaceAfter=10,
         spaceBefore=20,
-        fontName='Helvetica-Bold'
+        fontName='Helvetica-Bold',
+        leftIndent=0.3*inch  # Sangría para subtítulos
     )
     
     # Estilo para disclaimer

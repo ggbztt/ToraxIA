@@ -12,17 +12,6 @@ from config import MODEL_PATH, MODEL_CONFIG_PATH, THRESHOLDS_PATH, GRADCAM_LAYER
 
 @st.cache_resource
 def load_chestxray_model():
-    """
-    Carga el modelo pre-entrenado con caché de Streamlit.
-    
-    Returns:
-        model: Modelo Keras cargado
-        config: Diccionario con configuración (patologías, input_shape, thresholds, etc.)
-    
-    Raises:
-        FileNotFoundError: Si el modelo no existe
-        Exception: Si hay error al cargar
-    """
     try:
         # Verificar existencia
         if not MODEL_PATH.exists():
@@ -31,19 +20,15 @@ def load_chestxray_model():
                 f"Por favor, coloca 'best_model_epochs13-18.keras' en la carpeta 'models/'"
             )
         
-        # Cargar modelo
         model = load_model(str(MODEL_PATH))
         print(f"✅ Modelo cargado exitosamente desde {MODEL_PATH}")
         print(f"   Output shape: {model.output_shape}")
         
-        # Cargar configuración
         config = load_model_config()
         
-        # Cargar thresholds
         thresholds = load_thresholds()
         config['thresholds'] = thresholds
         
-        # Agregar configuración de Grad-CAM
         config['gradcam_layer'] = GRADCAM_LAYER_NAME
         
         return model, config
@@ -52,14 +37,7 @@ def load_chestxray_model():
         st.error(f"❌ Error al cargar el modelo: {str(e)}")
         raise
 
-
 def load_model_config():
-    """
-    Carga la configuración del modelo desde model_config.json
-    
-    Returns:
-        dict: Configuración con patologías y metadatos
-    """
     try:
         with open(MODEL_CONFIG_PATH, 'r', encoding='utf-8') as f:
             config = json.load(f)
@@ -68,7 +46,6 @@ def load_model_config():
         return config
     
     except FileNotFoundError:
-        # Configuración por defecto si no existe el archivo
         print("⚠️ model_config.json no encontrado, usando configuración por defecto")
         return {
             "pathologies": [
@@ -87,12 +64,6 @@ def load_model_config():
 
 
 def load_thresholds():
-    """
-    Carga los umbrales optimizados por patología desde THRESHOLDS.json
-    
-    Returns:
-        dict: Diccionario {pathology_name: threshold_value}
-    """
     try:
         with open(THRESHOLDS_PATH, 'r', encoding='utf-8') as f:
             thresholds = json.load(f)
@@ -101,7 +72,6 @@ def load_thresholds():
         return thresholds
     
     except FileNotFoundError:
-        # Thresholds por defecto (0.5 para todos)
         print("⚠️ THRESHOLDS.json no encontrado, usando 0.5 por defecto")
         return {
             "Atelectasis": 0.5, "Cardiomegaly": 0.5, "Effusion": 0.5, 
@@ -116,22 +86,10 @@ def load_thresholds():
 
 
 def get_class_names():
-    """
-    Obtiene solo los nombres de las clases/patologías
-    
-    Returns:
-        list: Lista de nombres de patologías
-    """
     config = load_model_config()
     return config.get('pathologies', [])
 
 
 def get_thresholds():
-    """
-    Obtiene los thresholds directamente
-    
-    Returns:
-        dict: Diccionario de thresholds por patología
-    """
     return load_thresholds()
 

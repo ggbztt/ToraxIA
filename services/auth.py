@@ -126,17 +126,48 @@ def login_user(email: str, password: str) -> Tuple[bool, Optional[Dict], str]:
         result = supabase.table('users').select('*').eq('email', email).execute()
         
         if not result.data:
+            # Registrar intento de login fallido
+            from services.audit_logger import log_event
+            log_event(
+                user_id=None,
+                user_email=email,
+                user_name='Desconocido',
+                event_type='auth',
+                action='login_failed',
+                details={'reason': 'Email no encontrado'},
+                status='error'
+            )
             return False, None, "Email no encontrado"
         
         user = result.data[0]
         
         # Verificar si está activo
         if not user.get('is_active', True):
+            from services.audit_logger import log_event
+            log_event(
+                user_id=user['id'],
+                user_email=user['email'],
+                user_name=f"{user['nombre']} {user['apellido']}",
+                event_type='auth',
+                action='login_failed',
+                details={'reason': 'Usuario desactivado'},
+                status='error'
+            )
             return False, None, "Usuario desactivado. Contacta al administrador"
         
         # Verificar contraseña
         password_hash = hash_password(password)
         if user['password_hash'] != password_hash:
+            from services.audit_logger import log_event
+            log_event(
+                user_id=user['id'],
+                user_email=user['email'],
+                user_name=f"{user['nombre']} {user['apellido']}",
+                event_type='auth',
+                action='login_failed',
+                details={'reason': 'Contraseña incorrecta'},
+                status='error'
+            )
             return False, None, "Contraseña incorrecta"
         
         # Actualizar last_login
@@ -144,6 +175,18 @@ def login_user(email: str, password: str) -> Tuple[bool, Optional[Dict], str]:
         supabase.table('users').update({
             'last_login': datetime.now().isoformat()
         }).eq('id', user['id']).execute()
+        
+        # Registrar login exitoso
+        from services.audit_logger import log_event
+        log_event(
+            user_id=user['id'],
+            user_email=user['email'],
+            user_name=f"{user['nombre']} {user['apellido']}",
+            event_type='auth',
+            action='login',
+            details={'role': user.get('role', 'estudiante')},
+            status='success'
+        )
         
         # Remover password_hash antes de retornar
         user.pop('password_hash', None)
@@ -370,6 +413,19 @@ def logout_with_persistence():
     """
     Logout que también elimina el token de query params.
     """
+    # Registrar logout en bitácora
+    if hasattr(st.session_state, 'user') and st.session_state.user:
+        from services.audit_logger import log_event
+        user = st.session_state.user
+        log_event(
+            user_id=user.get('id'),
+            user_email=user.get('email'),
+            user_name=f"{user.get('nombre', '')} {user.get('apellido', '')}",
+            event_type='auth',
+            action='logout',
+            status='success'
+        )
+    
     # Limpiar query params
     try:
         if SESSION_PARAM_KEY in st.query_params:

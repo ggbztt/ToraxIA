@@ -113,7 +113,7 @@ def main():
         if user_role == 'admin':
             page = st.radio(
                 "**Navegación**",
-                ["🏠 Inicio", "📤 Nuevo Análisis", "📊 Mi Historial", "🔥 Actividad Reciente", "👥 Gestión de Usuarios", "📚 Definiciones"],
+                ["🏠 Inicio", "📤 Nuevo Análisis", "📊 Mi Historial", "🔥 Actividad Reciente", "👥 Gestión de Usuarios", "📚 Definiciones", "📜 Bitácora"],
                 label_visibility="collapsed"
             )
         else:  # estudiante
@@ -149,6 +149,9 @@ def main():
         render_admin_users_page()
     elif page == "📚 Definiciones":
         render_admin_definitions_page()
+    elif page == "📜 Bitácora":
+        from views.audit_page import render_audit_page
+        render_audit_page()
 
 
 def render_home_page():
@@ -197,7 +200,7 @@ def render_home_page():
         st.metric("📊 Análisis Realizados", total_analyses, help="Total de análisis que has realizado")
     
     with col2:
-        st.metric("🎯 Precisión Promedio", precision_text, help="Precisión promedio de tus diagnósticos verificados")
+        st.metric("🎯 Precisión Promedio", precision_text, help="% de aciertos cuando tu pronóstico coincide con la predicción Top 1 de ToraxIA. 0% = Ninguna coincidencia. N/A = Sin verificaciones.")
     
     with col3:
         st.metric("📅 Último Análisis", last_analysis, help="Fecha de tu último análisis")
@@ -239,7 +242,7 @@ def render_home_page():
         <strong>Dataset:</strong> NIH ChestX-ray14<br>
         <strong>Imágenes de entrenamiento:</strong> 100,000<br>
         <strong>AUC Macro:</strong> 0.80<br>
-        <strong>Interpretabilidad:</strong> Saliency Maps<br><br>
+        <strong>Interpretabilidad:</strong> Grad-CAM <br><br>
         El modelo utiliza mapas de activación por gradientes para visualizar las regiones de interés.
         </div>
         """, unsafe_allow_html=True)
@@ -447,6 +450,11 @@ def render_profile_page():
         st.text_input("Rol", value=user['role'].capitalize(), disabled=True)
     
     st.info("💡 Para modificar tus datos, contacta al administrador")
+    
+    # Botón de contacto por Telegram
+    telegram_url = "https://t.me/ggbztt?text=Hola,%20necesito%20ayuda%20con%20mi%20cuenta%20de%20ToraxIA"
+    st.link_button("📱 Contactar por Telegram", telegram_url, width=True)
+
 
 
 def render_admin_users_page():

@@ -11,17 +11,6 @@ from utils.connectivity import check_internet_connection
 
 
 def save_analysis_to_database(analysis_results: Dict, form_data: Dict) -> Tuple[bool, str]:
-    """
-    Guarda un análisis completo en la base de datos Supabase
-    
-    Args:
-        analysis_results: Resultados del análisis (predicciones, imágenes, etc.)
-        form_data: Datos del formulario pre-diagnóstico
-    
-    Returns:
-        Tuple[bool, str]: (éxito, mensaje)
-    """
-    
     # Verificar conexión a internet
     if not check_internet_connection():
         return False, "No hay conexión a internet. El análisis no se guardó en la base de datos."
@@ -122,6 +111,24 @@ def save_analysis_to_database(analysis_results: Dict, form_data: Dict) -> Tuple[
         result = supabase.table('analyses').insert(analysis_data).execute()
         
         if result.data:
+            # Registrar evento de creación de análisis
+            from services.audit_logger import log_event
+            log_event(
+                user_id=user_id,
+                user_email=user['email'],
+                user_name=f"{user['nombre']} {user['apellido']}",
+                event_type='analysis',
+                action='create_analysis',
+                entity_type='analysis',
+                entity_id=result.data[0]['id'],
+                details={
+                    'paciente': f"{form_data['paciente_nombre']} {form_data['paciente_apellido']}",
+                    'top_prediction': analysis_results['top_class'],
+                    'top_probability': float(analysis_results['top_prob'])
+                },
+                status='success'
+            )
+            
             images_msg = " con imágenes 📷" if original_url else " (sin imágenes)"
             return True, f"✅ Análisis guardado exitosamente{images_msg} (ID: {result.data[0]['id'][:8]}...)"
         else:
@@ -132,21 +139,10 @@ def save_analysis_to_database(analysis_results: Dict, form_data: Dict) -> Tuple[
 
 
 def calculate_accuracy(pronostico_real: str, top_prediction: str) -> bool:
-    """
-    Calcula si ToraxIA acertó el pronóstico
-    
-    Args:
-        pronostico_real: Pronóstico real ingresado por el usuario
-        top_prediction: Predicción principal del modelo
-    
-    Returns:
-        True si acertó, False si no
-    """
     import unicodedata
     from utils.translations import translate_pathology
     
     def normalize_text(text):
-        """Normaliza texto: quita acentos, minúsculas, espacios"""
         text = unicodedata.normalize('NFD', text)
         text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
         text = text.lower().replace(' ', '').replace('_', '').replace('-', '')
@@ -167,16 +163,6 @@ def calculate_accuracy(pronostico_real: str, top_prediction: str) -> bool:
 
 
 def get_user_analyses(user_id: str, limit: int = 20) -> list:
-    """
-    Obtiene los análisis de un usuario específico
-    
-    Args:
-        user_id: ID del usuario
-        limit: Número máximo de análisis a retornar
-    
-    Returns:
-        Lista de análisis ordenados por fecha (más reciente primero)
-    """
     try:
         supabase = get_supabase_client()
         
@@ -195,15 +181,6 @@ def get_user_analyses(user_id: str, limit: int = 20) -> list:
 
 
 def get_recent_public_analyses(limit: int = 20) -> list:
-    """
-    Obtiene los análisis públicos más recientes (para Actividad Reciente)
-    
-    Args:
-        limit: Número máximo de análisis a retornar
-    
-    Returns:
-        Lista de análisis públicos ordenados por fecha
-    """
     try:
         supabase = get_supabase_client()
         
@@ -218,4 +195,26 @@ def get_recent_public_analyses(limit: int = 20) -> list:
         
     except Exception as e:
         st.error(f"Error al obtener análisis públicos: {str(e)}")
+        return []
+
+
+def get_all_users() -> list:
+    """
+    Obtiene todos los usuarios del sistema (para admin).
+    
+    Returns:
+        list: Lista de usuarios con sus datos básicos
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        result = supabase.table('users')\
+            .select('id, nombre, apellido, email, role, is_active, area_estudio')\
+            .order('nombre', desc=False)\
+            .execute()
+        
+        return result.data if result.data else []
+        
+    except Exception as e:
+        print(f"Error al obtener usuarios: {str(e)}")
         return []

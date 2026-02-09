@@ -365,10 +365,25 @@ def render_analysis_card(analysis: dict, index: int):
 def delete_analysis(analysis_id: str) -> bool:
     """Elimina un análisis de la base de datos"""
     try:
-        from services.auth import get_supabase_client
+        from services.auth import get_supabase_client, get_current_user
         supabase = get_supabase_client()
+        user = get_current_user()
         
         result = supabase.table('analyses').delete().eq('id', analysis_id).execute()
+        
+        # Registrar evento de eliminación
+        from services.audit_logger import log_event
+        log_event(
+            user_id=user['id'],
+            user_email=user['email'],
+            user_name=f"{user['nombre']} {user['apellido']}",
+            event_type='analysis',
+            action='delete_analysis',
+            entity_type='analysis',
+            entity_id=analysis_id,
+            status='success'
+        )
+        
         return True
         
     except Exception as e:

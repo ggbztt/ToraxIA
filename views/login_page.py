@@ -54,7 +54,7 @@ def render_login_page():
             email = st.text_input("📧 Email", placeholder="tu@email.com")
             password = st.text_input("🔒 Contraseña", type="password")
             
-            submit = st.form_submit_button("Iniciar Sesión", type="primary", width="content")
+            submit = st.form_submit_button("Iniciar Sesión", type="primary", use_container_width=True)
             
             if submit:
                 if not email or not password:
@@ -114,7 +114,7 @@ def render_login_page():
             
             st.markdown("---")
             
-            submit = st.form_submit_button("Registrarse", type="primary", width="content")
+            submit = st.form_submit_button("Registrarse", type="primary", use_container_width=True)
             
             if submit:
                 # Validaciones

@@ -102,7 +102,7 @@ def render_analysis_page():
     
     with col1:
         st.markdown("#### 📷 Vista Previa")
-        st.image(image, width="content")
+        st.image(image, use_container_width=True)
     
     with col2:
         st.markdown("#### ℹ️ Información")
@@ -113,7 +113,7 @@ def render_analysis_page():
     st.markdown("---")
     
     # Botón de análisis
-    if st.button("🔬 Analizar Radiografía", type="primary", width="content"):
+    if st.button("🔬 Analizar Radiografía", type="primary", use_container_width=True):
         
         # Obtener modelo precargado
         model = st.session_state.model
@@ -301,7 +301,7 @@ def render_pre_diagnosis_form(user):
         submitted = st.form_submit_button(
             "✅ Continuar con el Análisis",
             type="primary",
-            width="content"
+            use_container_width=True
         )
         
         if submitted:
@@ -388,11 +388,11 @@ def show_results(results):
     
     with col1:
         st.markdown("#### 📷 Radiografía Original")
-        st.image(results['original_image'], width="content")
+        st.image(results['original_image'], use_container_width=True)
     
     with col2:
         st.markdown("#### 🔥 Mapa de Activación (Grad-CAM)")
-        st.image(results['overlay'], width="content", caption="Regiones de mayor activación del modelo")
+        st.image(results['overlay'], use_container_width=True, caption="Regiones de mayor activación del modelo")
     
     st.markdown("---")
     
@@ -502,7 +502,7 @@ def show_results(results):
                                 heatmap, overlay, _ = generate_gradcam_for_class(
                                     model, img_array, idx, class_names
                                 )
-                                st.image(overlay, caption=f"Grad-CAM: {name_es}", width="content")
+                                st.image(overlay, caption=f"Grad-CAM: {name_es}", use_container_width=True)
                             except Exception as e:
                                 st.error(f"Error generando Grad-CAM: {str(e)}")
             else:
@@ -596,7 +596,7 @@ def show_results(results):
     
     st.dataframe(
         df,
-        width="content",
+        use_container_width=True,
         hide_index=False,
         column_config={
             "Patología": st.column_config.TextColumn("Patología", width="medium"),

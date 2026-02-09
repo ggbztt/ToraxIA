@@ -226,14 +226,14 @@ def render_analysis_card(analysis: dict, index: int):
             with img_col1:
                 if original_url:
                     st.markdown("**Radiografía Original:**")
-                    st.image(original_url, width="content")
+                    st.image(original_url, use_container_width=True)
                 else:
                     st.info("📷 Imagen original no disponible")
             
             with img_col2:
                 if overlay_url:
                     st.markdown("**Mapa de Activación (Grad-CAM):**")
-                    st.image(overlay_url, width="content")
+                    st.image(overlay_url, use_container_width=True)
                 else:
                     st.info("🔥 Overlay no disponible")
             

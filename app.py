@@ -126,7 +126,7 @@ def main():
         st.markdown("---")
         
         # Botón de logout
-        if st.button("🚪 Cerrar Sesión", width="content"):
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
             logout_with_persistence()
             st.rerun()
         
@@ -293,7 +293,7 @@ def render_activity_feed():
     
     with col_refresh:
         st.markdown("<br>", unsafe_allow_html=True)  # Espaciador para alinear
-        if st.button("🔄 Actualizar", width="content"):
+        if st.button("🔄 Actualizar", use_container_width=True):
             st.rerun()
     
     st.markdown("---")
@@ -389,7 +389,7 @@ def render_activity_card(analysis: dict, index: int):
         
         with col1:
             if overlay_url:
-                st.image(overlay_url, caption="Mapa de Activación", width="content")
+                st.image(overlay_url, caption="Mapa de Activación", use_container_width=True)
             else:
                 st.info("📷 Sin imagen")
         
@@ -453,7 +453,7 @@ def render_profile_page():
     
     # Botón de contacto por Telegram
     telegram_url = "https://t.me/ggbztt?text=Hola,%20necesito%20ayuda%20con%20mi%20cuenta%20de%20ToraxIA"
-    st.link_button("📱 Contactar por Telegram", telegram_url, width=True)
+    st.link_button("📱 Contactar por Telegram", telegram_url, use_container_width=True)
 
 
 
@@ -794,10 +794,10 @@ def render_admin_definitions_page():
         col_save, col_clear = st.columns(2)
         
         with col_save:
-            submit = st.form_submit_button("💾 Guardar Definición", type="primary", width="content")
+            submit = st.form_submit_button("💾 Guardar Definición", type="primary", use_container_width=True)
         
         with col_clear:
-            clear = st.form_submit_button("🗑️ Limpiar", width="content")
+            clear = st.form_submit_button("🗑️ Limpiar", use_container_width=True)
         
         if submit and technical_definition.strip():
             try:
